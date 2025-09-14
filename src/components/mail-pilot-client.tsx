@@ -8,12 +8,12 @@ import { Bot, Send, Loader2, User, AlertTriangle, CornerDownLeft } from 'lucide-
 import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { sendPromptAction, type ActionResult } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
+const WEBHOOK_URL = 'https://ak99055.app.n8n.cloud/webhook/firebase';
 
 const formSchema = z.object({
   prompt: z.string().min(1, {
@@ -21,7 +21,15 @@ const formSchema = z.object({
   }),
 });
 
-type ConversationEntry = ActionResult & { id: string, status: ActionResult['status'] | 'pending' };
+type ConversationStatus = 'idle' | 'pending' | 'success' | 'error';
+
+type ConversationEntry = {
+    id: string;
+    status: ConversationStatus;
+    message: string;
+    prompt?: string;
+    webhookResponse?: string;
+};
 
 export default function MailPilotClient() {
   const [conversation, setConversation] = useState<ConversationEntry[]>([]);
@@ -43,7 +51,7 @@ export default function MailPilotClient() {
       id: `user-${Date.now()}`,
       status: 'idle',
       message: '',
-      data: { prompt: values.prompt }
+      prompt: values.prompt,
     };
     
     const botThinkingMessage: ConversationEntry = {
@@ -54,23 +62,75 @@ export default function MailPilotClient() {
 
     setConversation(prev => [...prev, userMessage, botThinkingMessage]);
     
-    const result = await sendPromptAction(values.prompt);
-    
-    setConversation(prev => 
-      prev.map(entry => 
-        entry.id === botThinkingMessage.id ? { ...botThinkingMessage, ...result, status: result.status } : entry
-      )
-    );
+    try {
+      const payload = {
+        prompt: values.prompt,
+      };
+
+      const response = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('Webhook error:', errorBody);
+        throw new Error(`The service failed. Status: ${response.status}.`);
+      }
+      
+      const responseData = await response.json();
+      const webhookOutput = responseData.output;
+
+      if (typeof webhookOutput !== 'string') {
+          throw new Error('Invalid response format from webhook.');
+      }
+
+      const successResult = {
+        status: 'success' as ConversationStatus,
+        message: 'Prompt successfully sent.',
+        webhookResponse: webhookOutput
+      };
+
+      setConversation(prev => 
+        prev.map(entry => 
+          entry.id === botThinkingMessage.id ? { ...botThinkingMessage, ...successResult } : entry
+        )
+      );
+
+    } catch (error) {
+      let errorMessage = 'An unknown error occurred.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      console.error('onSubmit error:', error);
+      
+      const errorResult = {
+        status: 'error' as ConversationStatus,
+        message: errorMessage,
+      };
+
+      setConversation(prev => 
+        prev.map(entry => 
+          entry.id === botThinkingMessage.id ? { ...botThinkingMessage, ...errorResult } : entry
+        )
+      );
+    }
 
     setIsSubmitting(false);
   }
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTo({
-        top: scrollAreaRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
+      const viewport = scrollAreaRef.current.querySelector('div');
+      if (viewport) {
+        viewport.scrollTo({
+          top: viewport.scrollHeight,
+          behavior: 'smooth',
+        });
+      }
     }
   }, [conversation]);
   
@@ -105,14 +165,14 @@ export default function MailPilotClient() {
                 "max-w-[75%] rounded-lg p-3 text-sm",
                 entry.status === 'idle' ? "bg-primary text-primary-foreground" : "bg-muted"
               )}>
-                {entry.status === 'idle' && entry.data?.prompt}
+                {entry.status === 'idle' && entry.prompt}
                 {entry.status === 'pending' && (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>{entry.message}</span>
                   </div>
                 )}
-                {entry.status === 'success' && <pre className="whitespace-pre-wrap">{entry.data?.webhookResponse}</pre>}
+                {entry.status === 'success' && <pre className="whitespace-pre-wrap">{entry.webhookResponse}</pre>}
                 {entry.status === 'error' && (
                    <Alert variant="destructive" className="p-2">
                     <AlertTriangle className="h-4 w-4" />
@@ -140,13 +200,15 @@ export default function MailPilotClient() {
               name="prompt"
               render={({ field }) => (
                 <FormItem>
-                  <Textarea
-                    placeholder='e.g., "Hello world!"'
-                    className="pr-20 min-h-[50px] resize-none"
-                    onKeyDown={handleTextareaKeyDown}
-                    disabled={isSubmitting}
-                    {...field}
-                  />
+                  <FormControl>
+                    <Textarea
+                      placeholder='e.g., "Hello world!"'
+                      className="pr-20 min-h-[50px] resize-none"
+                      onKeyDown={handleTextareaKeyDown}
+                      disabled={isSubmitting}
+                      {...field}
+                    />
+                  </FormControl>
                   <p className="text-xs text-muted-foreground absolute bottom-3 left-3 flex items-center">
                     <CornerDownLeft className="w-3 h-3 mr-1" />
                     <span className="font-semibold">Enter</span> to send, <span className="font-semibold">Shift + Enter</span> for new line
