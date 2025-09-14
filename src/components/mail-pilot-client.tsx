@@ -1,16 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Bot, Send, Loader2, CheckCircle, AlertTriangle, Paperclip } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
+import { Bot, Send, Loader2, User, AlertTriangle, CornerDownLeft } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem } from '@/components/ui/form';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { sendPromptAction, type ActionResult } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
+
 
 const formSchema = z.object({
   prompt: z.string().min(1, {
@@ -19,7 +22,10 @@ const formSchema = z.object({
 });
 
 export default function MailPilotClient() {
-  const [formState, setFormState] = useState<ActionResult>({ status: 'idle', message: '' });
+  const [conversation, setConversation] = useState<ActionResult[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -27,82 +33,120 @@ export default function MailPilotClient() {
     },
   });
 
-  const { isSubmitting } = form.formState;
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setFormState({ status: 'idle', message: '' });
+    setIsSubmitting(true);
+    const userMessage: ActionResult = {
+      status: 'idle',
+      message: '',
+      data: { prompt: values.prompt }
+    };
+    setConversation(prev => [...prev, userMessage]);
+    
     const result = await sendPromptAction(values.prompt);
-    setFormState(result);
-    if(result.status === 'success'){
+    setConversation(prev => [...prev, result]);
+
+    if (result.status === 'success') {
       form.reset();
     }
+    setIsSubmitting(false);
   }
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTo({
+        top: scrollAreaRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, [conversation]);
   
+  const handleTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      form.handleSubmit(onSubmit)();
+    }
+  };
+
   return (
-    <Card className="w-full max-w-2xl shadow-2xl border-none">
-      <CardHeader className="text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
-          <Bot className="h-8 w-8 text-primary" />
+    <div className="flex flex-col h-full w-full max-w-4xl mx-auto">
+      <header className="flex items-center p-4 border-b">
+        <Bot className="h-8 w-8 text-primary" />
+        <h1 className="text-xl font-bold ml-3">Prompt Sender</h1>
+      </header>
+      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+        <div className="space-y-6">
+          {conversation.map((entry, index) => (
+            <div key={index} className={cn(
+              "flex items-start gap-4",
+              entry.status === 'idle' ? "justify-end" : "justify-start"
+            )}>
+              {entry.status !== 'idle' && (
+                 <Avatar className="h-8 w-8">
+                  <AvatarFallback><Bot className="text-primary"/></AvatarFallback>
+                </Avatar>
+              )}
+               <div className={cn(
+                "max-w-[75%] rounded-lg p-3 text-sm",
+                entry.status === 'idle' ? "bg-primary text-primary-foreground" : "bg-muted"
+              )}>
+                {entry.status === 'idle' && entry.data?.prompt}
+                {entry.status === 'success' && <p>I have successfully sent the prompt: "{entry.data?.prompt}"</p>}
+                {entry.status === 'error' && (
+                   <Alert variant="destructive" className="p-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>
+                      {entry.message}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+              {entry.status === 'idle' && (
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback><User /></AvatarFallback>
+                </Avatar>
+              )}
+            </div>
+          ))}
         </div>
-        <CardTitle className="text-3xl font-bold font-headline">Prompt Sender</CardTitle>
-        <CardDescription className="text-muted-foreground pt-1">
-          Send a prompt to a webhook.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-4 sm:px-6">
+      </ScrollArea>
+      <div className="p-4 border-t">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="relative">
             <FormField
               control={form.control}
               name="prompt"
               render={({ field }) => (
                 <FormItem>
-                  <div className="relative">
-                    <Paperclip className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      placeholder='e.g., "Hello world!"'
-                      className="pl-11 h-14 text-base"
-                      {...field}
-                    />
-                  </div>
-                  <FormMessage />
+                  <Textarea
+                    placeholder='e.g., "Hello world!"'
+                    className="pr-20 min-h-[50px] resize-none"
+                    onKeyDown={handleTextareaKeyDown}
+                    {...field}
+                  />
+                  <p className="text-xs text-muted-foreground absolute bottom-3 left-3 flex items-center">
+                    <CornerDownLeft className="w-3 h-3 mr-1" />
+                    <span className="font-semibold">Enter</span> to send, <span className="font-semibold">Shift + Enter</span> for new line
+                  </p>
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full h-12 text-lg font-semibold" disabled={isSubmitting}>
+            <Button 
+              type="submit"
+              size="icon"
+              className="absolute right-3 top-1/2 -translate-y-1/2 h-9 w-12"
+              disabled={isSubmitting}
+            >
               {isSubmitting ? (
-                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <Send className="mr-2 h-5 w-5" />
+                <Send className="h-5 w-5" />
               )}
-              {isSubmitting ? 'Sending...' : 'Send Prompt'}
+              <span className="sr-only">Send</span>
             </Button>
           </form>
         </Form>
-        <div className="mt-6 min-h-[140px]">
-          {formState.status === 'success' && (
-            <Alert variant="default" className="bg-accent/10 border-accent/20">
-              <CheckCircle className="h-4 w-4 text-accent" />
-              <AlertTitle className="text-accent font-bold">Success!</AlertTitle>
-              <AlertDescription className="text-accent/90">
-                {formState.message}
-                <div className="mt-2 p-3 bg-accent/10 rounded-md text-sm">
-                  <p className="font-semibold">Prompt Sent: <span className="font-normal">"{formState.data?.prompt}"</span></p>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-          {formState.status === 'error' && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>
-                {formState.message}
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

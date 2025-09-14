@@ -1,6 +1,6 @@
 'use server';
 
-const WEBHOOK_URL = 'https://ak99055.app.n8n.cloud/webhook-test/firebase';
+const WEBHOOK_URL = 'https://ak99055.app.n8n.cloud/webhook/firebase';
 
 export type ActionResult = {
   status: 'idle' | 'success' | 'error';
