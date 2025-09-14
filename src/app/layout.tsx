@@ -5,6 +5,9 @@ import { Toaster } from '@/components/ui/toaster';
 export const metadata: Metadata = {
   title: 'Prompt Sender',
   description: 'Send a prompt to a webhook.',
+  icons: {
+    icon: '/mail-pilot/favicon.ico',
+  },
 };
 
 export default function RootLayout({
