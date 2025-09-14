@@ -7,6 +7,8 @@
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
+    "export": "next export",
+    "deploy:gh": "rm -rf out && rm -rf docs && next build && next export && mv out docs && touch docs/.nojekyll",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
