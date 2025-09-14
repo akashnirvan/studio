@@ -32,7 +32,13 @@ export async function sendPromptAction(prompt: string): Promise<ActionResult> {
     }
     
     const responseData = await response.json();
-    const webhookOutput = JSON.stringify(responseData, null, 2);
+
+    // The response is expected to be an object like { output: "some message" }
+    const webhookOutput = responseData.output;
+
+    if (typeof webhookOutput !== 'string') {
+        throw new Error('Invalid response format from webhook.');
+    }
 
     return {
       status: 'success',
