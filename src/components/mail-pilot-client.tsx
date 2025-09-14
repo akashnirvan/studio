@@ -112,7 +112,7 @@ export default function MailPilotClient() {
                     <span>{entry.message}</span>
                   </div>
                 )}
-                {entry.status === 'success' && <p>{entry.data?.webhookResponse}</p>}
+                {entry.status === 'success' && <pre className="whitespace-pre-wrap">{entry.data?.webhookResponse}</pre>}
                 {entry.status === 'error' && (
                    <Alert variant="destructive" className="p-2">
                     <AlertTriangle className="h-4 w-4" />

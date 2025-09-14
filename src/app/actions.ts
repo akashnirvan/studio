@@ -32,7 +32,7 @@ export async function sendPromptAction(prompt: string): Promise<ActionResult> {
     }
     
     const responseData = await response.json();
-    const webhookOutput = responseData[0]?.output || 'Received a response, but could not find output.';
+    const webhookOutput = JSON.stringify(responseData, null, 2);
 
     return {
       status: 'success',
