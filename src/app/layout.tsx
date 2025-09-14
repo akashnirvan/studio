@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'Mail Pilot',
-  description: 'Your AI assistant for sending emails.',
+  title: 'Prompt Sender',
+  description: 'Send a prompt to a webhook.',
 };
 
 export default function RootLayout({

@@ -9,12 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { sendEmailAction, type ActionResult } from '@/app/actions';
+import { sendPromptAction, type ActionResult } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const formSchema = z.object({
-  prompt: z.string().min(10, {
-    message: 'Please provide a more detailed prompt (at least 10 characters).',
+  prompt: z.string().min(1, {
+    message: 'Please provide a prompt.',
   }),
 });
 
@@ -31,7 +31,7 @@ export default function MailPilotClient() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setFormState({ status: 'idle', message: '' });
-    const result = await sendEmailAction(values.prompt);
+    const result = await sendPromptAction(values.prompt);
     setFormState(result);
     if(result.status === 'success'){
       form.reset();
@@ -44,9 +44,9 @@ export default function MailPilotClient() {
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
           <Bot className="h-8 w-8 text-primary" />
         </div>
-        <CardTitle className="text-3xl font-bold font-headline">Mail Pilot</CardTitle>
+        <CardTitle className="text-3xl font-bold font-headline">Prompt Sender</CardTitle>
         <CardDescription className="text-muted-foreground pt-1">
-          Your AI assistant for sending emails. Just tell me what to do.
+          Send a prompt to a webhook.
         </CardDescription>
       </CardHeader>
       <CardContent className="px-4 sm:px-6">
@@ -60,7 +60,7 @@ export default function MailPilotClient() {
                   <div className="relative">
                     <Paperclip className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
-                      placeholder='e.g., "Email hello@example.com that I will be late today"'
+                      placeholder='e.g., "Hello world!"'
                       className="pl-11 h-14 text-base"
                       {...field}
                     />
@@ -75,7 +75,7 @@ export default function MailPilotClient() {
               ) : (
                 <Send className="mr-2 h-5 w-5" />
               )}
-              {isSubmitting ? 'Processing...' : 'Send Email'}
+              {isSubmitting ? 'Sending...' : 'Send Prompt'}
             </Button>
           </form>
         </Form>
@@ -87,8 +87,7 @@ export default function MailPilotClient() {
               <AlertDescription className="text-accent/90">
                 {formState.message}
                 <div className="mt-2 p-3 bg-accent/10 rounded-md text-sm">
-                  <p className="font-semibold">To: <span className="font-normal">{formState.data?.email}</span></p>
-                  <p className="font-semibold mt-1">Message: <span className="font-normal">"{formState.data?.message}"</span></p>
+                  <p className="font-semibold">Prompt Sent: <span className="font-normal">"{formState.data?.prompt}"</span></p>
                 </div>
               </AlertDescription>
             </Alert>
