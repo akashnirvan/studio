@@ -21,8 +21,10 @@ const formSchema = z.object({
   }),
 });
 
+type ConversationEntry = ActionResult & { id: string, status: ActionResult['status'] | 'pending' };
+
 export default function MailPilotClient() {
-  const [conversation, setConversation] = useState<ActionResult[]>([]);
+  const [conversation, setConversation] = useState<ConversationEntry[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -35,19 +37,31 @@ export default function MailPilotClient() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    const userMessage: ActionResult = {
+    form.reset();
+
+    const userMessage: ConversationEntry = {
+      id: `user-${Date.now()}`,
       status: 'idle',
       message: '',
       data: { prompt: values.prompt }
     };
-    setConversation(prev => [...prev, userMessage]);
+    
+    const botThinkingMessage: ConversationEntry = {
+      id: `bot-${Date.now()}`,
+      status: 'pending',
+      message: 'Thinking...',
+    };
+
+    setConversation(prev => [...prev, userMessage, botThinkingMessage]);
     
     const result = await sendPromptAction(values.prompt);
-    setConversation(prev => [...prev, result]);
+    
+    setConversation(prev => 
+      prev.map(entry => 
+        entry.id === botThinkingMessage.id ? { ...botThinkingMessage, ...result, status: result.status } : entry
+      )
+    );
 
-    if (result.status === 'success') {
-      form.reset();
-    }
     setIsSubmitting(false);
   }
 
@@ -63,7 +77,9 @@ export default function MailPilotClient() {
   const handleTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      form.handleSubmit(onSubmit)();
+      if(!isSubmitting) {
+        form.handleSubmit(onSubmit)();
+      }
     }
   };
 
@@ -75,8 +91,8 @@ export default function MailPilotClient() {
       </header>
       <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
         <div className="space-y-6">
-          {conversation.map((entry, index) => (
-            <div key={index} className={cn(
+          {conversation.map((entry) => (
+            <div key={entry.id} className={cn(
               "flex items-start gap-4",
               entry.status === 'idle' ? "justify-end" : "justify-start"
             )}>
@@ -90,6 +106,12 @@ export default function MailPilotClient() {
                 entry.status === 'idle' ? "bg-primary text-primary-foreground" : "bg-muted"
               )}>
                 {entry.status === 'idle' && entry.data?.prompt}
+                {entry.status === 'pending' && (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>{entry.message}</span>
+                  </div>
+                )}
                 {entry.status === 'success' && <p>{entry.data?.webhookResponse}</p>}
                 {entry.status === 'error' && (
                    <Alert variant="destructive" className="p-2">
@@ -122,6 +144,7 @@ export default function MailPilotClient() {
                     placeholder='e.g., "Hello world!"'
                     className="pr-20 min-h-[50px] resize-none"
                     onKeyDown={handleTextareaKeyDown}
+                    disabled={isSubmitting}
                     {...field}
                   />
                   <p className="text-xs text-muted-foreground absolute bottom-3 left-3 flex items-center">
