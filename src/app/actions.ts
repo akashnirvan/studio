@@ -7,6 +7,7 @@ export type ActionResult = {
   message: string;
   data?: {
     prompt: string;
+    webhookResponse?: string;
   };
 };
 
@@ -30,12 +31,16 @@ export async function sendPromptAction(prompt: string): Promise<ActionResult> {
       throw new Error(`The service failed. Status: ${response.status}.`);
     }
     
-    await response.json();
+    const responseData = await response.json();
+    const webhookOutput = responseData[0]?.output || 'Received a response, but could not find output.';
 
     return {
       status: 'success',
-      message: `Prompt successfully sent.`,
-      data: { prompt },
+      message: 'Prompt successfully sent.',
+      data: { 
+        prompt,
+        webhookResponse: webhookOutput
+      },
     };
   } catch (error) {
     let errorMessage = 'An unknown error occurred.';

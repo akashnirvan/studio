@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { sendPromptAction, type ActionResult } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 
@@ -90,7 +90,7 @@ export default function MailPilotClient() {
                 entry.status === 'idle' ? "bg-primary text-primary-foreground" : "bg-muted"
               )}>
                 {entry.status === 'idle' && entry.data?.prompt}
-                {entry.status === 'success' && <p>I have successfully sent the prompt: "{entry.data?.prompt}"</p>}
+                {entry.status === 'success' && <p>{entry.data?.webhookResponse}</p>}
                 {entry.status === 'error' && (
                    <Alert variant="destructive" className="p-2">
                     <AlertTriangle className="h-4 w-4" />
